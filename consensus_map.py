@@ -160,7 +160,7 @@ def count_fragments(infile,fimofile, dist_5, dist_3):
 	region_len = arrays[0][-1]
 	regions = len(arrays) - 1
 
-	#get element index for center position
+	#get list index for center position
 	for i in range(region_len):
 		if arrays[0][i + 6] == 0:
 			center = i + 6
@@ -169,7 +169,7 @@ def count_fragments(infile,fimofile, dist_5, dist_3):
 			center = i + 6 - 0.5
 			break
 
-	#create a list for total, which will be appended to the *arrays* list later
+	#any matches within the region of the consensus entries will also be added here
 	total = ['SUM', 'N/A', 'N/A','N/A','N/A','N/A']
 	for i in range(region_len):
 		total.append(0)	
@@ -312,13 +312,18 @@ def fimo_entry(line, dist_5, dist_3, odd_len, region_len):
 			array.append(0)
 	return array
 
-def stream_version(iname, fname, dist_5, dist_3):
+def stream_version(sfile, cfile, dist_5, dist_3):
+	#sfile = file path from in_file
+	#cfile = file path from fimo_file
+	#dist_5 = desired size of region of interest 5prime to the middle of the motif (len_5)
+	#dist_3 = desired size of region of interest 3prime to the middle of the motif (len_3)
+
 	header=[]
 	temp=[]
 	temps=[]
 
-	#create header
-	with open(fname) as f:
+	#Create a list named header with header information
+	with open(cfile) as f:
 		next(f)
 		header = ['chrID', 'start', 'stop', 'center', 'strand', 'p-value']
 		columns = next(f).split('\t')
@@ -347,11 +352,55 @@ def stream_version(iname, fname, dist_5, dist_3):
 			break
 	print header
 
+	with open(sfile) as s, open(cfile) as c:
+		#skip headers
+		next(s)
+		next(c)
+
+		#current_c = current motif entry that is to be compared with
+		#next_c = next motif entry
+		current_c = (next(c), dist_5, dist_3, odd_len, region_len)
+		next_c = (next(c), dist_5, dist_3, odd_len, region_len)
+
+		for line in s:
+			ldata = line.split('\t')
+			ldata[1] = int(ldata[1])
+
+			#if chromosome name in ldata[0] does not match the chrID in motif data current_c[0], skip
+			if ldata[0] != current_c[0]:
+				continue
+			#if position value of ldata[1] is smaller than the motif region current_c[1], skip
+			if ldata[1] < current_c[1]:
+				continue
+
+			#if current ldata entry is in region of interest... do stuff			
+			if ldata[1] >= current_c[1] and ldata[1] <= current_c[2]:
+				ldata[2] = int(ldata[2])
+				distance_from_center = current_c[3] - ldata[1]
+				if (abs(distance_from_center) % 1) == 0:
+					if current_c[4] == '+':
+						current_c[center - distance_from_center] += abs(ldata[2])
+						total[center - distance_from_center] += abs(ldata[2])
+					elif current_c[4] == '-':
+						current_c[center + distance_from_center] += abs(ldata[2])
+						total[center + distance_from_center] += abs(ldata[2])
+				if (abs(distance_from_center) % 1) > 0:
+					if current_c[4] == '+':
+						current_c[int(center - distance_from_center)] += abs(ldata[2])
+						total[int(center - distance_from_center)] += abs(ldata[2])
+					elif current_c[4] == '-':
+						current_c[int(center + distance_from_center)] += abs(ldata[2])
+						total[int(center + distance_from_center)] += abs(ldata[2])
+
+
+
+'''
 	with open(iname) as z, open(fname) as f:
+		#Skip header in files
 		next(z)
 		next(f)
-		fimo_list = []
-		#get first few fimo entries
+		fimo_list = [] #This list will contain
+		#Retrieve a few consensus entries from fimo tsv
 		fimo_list.append(fimo_entry(next(f), dist_5, dist_3, odd_len, region_len))
 		while True:
 			fimo_entry = fimo_entry(next(f), dist_5, dist_3, odd_len, region_len)
@@ -389,38 +438,7 @@ def stream_version(iname, fname, dist_5, dist_3):
 				#if query pos is < than 5post, move on
 				if int(query[1]) < entry[1]:
 					break
-
-
-		'''
-		while True:
-
-
-		#current_query = fimo_query(next(f), dist_5, dist_3, odd_len, region_len)
-		next_entry = fimo_entry(next(f), dist_5, dist_3, odd_len, region_len)
-		while True:
-			current_entry = next_entry
-			next_entry = fimo_entry(next(f, -1), dist_5, dist_3, odd_len, region_len)
-			#print current_query
-
-			#cycle through queries list
-			if len(queries) > 0:
-				for i in range(len(queries)):
-					if queries[i][0] == current_entry[0]:
-
-			while True:
-				if len(queries) > 0:
-					for q in queries:
-						if q[0] == current_query:
-
-						else
-				query = next(z).split('\t')
-				if query[0] != 
-
-
-			if next_query == -1:
-				break
-			'''
-
+'''
 
 in_file = file_path(sys.argv[1])
 fimo_file = file_path(sys.argv[2])
