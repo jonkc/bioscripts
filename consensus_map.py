@@ -312,15 +312,11 @@ def fimo_entry(line, dist_5, dist_3, odd_len, region_len):
 			array.append(0)
 	return array
 
-def stream_version(sfile, cfile, dist_5, dist_3):
+def stream_version(sfile, cfile, dist_5, dist_3, flag):
 	#sfile = file path from in_file
 	#cfile = file path from fimo_file
 	#dist_5 = desired size of region of interest 5prime to the middle of the motif (len_5)
 	#dist_3 = desired size of region of interest 3prime to the middle of the motif (len_3)
-
-	header=[]
-	temp=[]
-	temps=[]
 
 	#Create a list named header with header information
 	with open(cfile) as f:
@@ -350,7 +346,7 @@ def stream_version(sfile, cfile, dist_5, dist_3):
 		elif header[i + 6] == 1:
 			center = i + 6 - 0.5
 			break
-	print header
+	print('\t'.join(map(str,header)))
 
 	with open(sfile) as s, open(cfile) as c:
 		#skip headers
@@ -359,8 +355,13 @@ def stream_version(sfile, cfile, dist_5, dist_3):
 
 		#current_c = current motif entry that is to be compared with
 		#next_c = next motif entry
-		current_c = (next(c), dist_5, dist_3, odd_len, region_len)
-		next_c = (next(c), dist_5, dist_3, odd_len, region_len)
+		current_c = fimo_entry(next(c, -1), dist_5, dist_3, odd_len, region_len)
+		next_c = fimo_entry(next(c, -1), dist_5, dist_3, odd_len, region_len)
+
+		#any matches within the region of the consensus entries will also be added here
+		total = ['SUM', 'N/A', 'N/A','N/A','N/A','N/A']
+		for i in range(region_len):
+			total.append(0)
 
 		for line in s:
 			ldata = line.split('\t')
@@ -373,26 +374,45 @@ def stream_version(sfile, cfile, dist_5, dist_3):
 			if ldata[1] < current_c[1]:
 				continue
 
-			#if current ldata entry is in region of interest... do stuff			
-			if ldata[1] >= current_c[1] and ldata[1] <= current_c[2]:
-				ldata[2] = int(ldata[2])
-				distance_from_center = current_c[3] - ldata[1]
-				if (abs(distance_from_center) % 1) == 0:
-					if current_c[4] == '+':
-						current_c[center - distance_from_center] += abs(ldata[2])
-						total[center - distance_from_center] += abs(ldata[2])
-					elif current_c[4] == '-':
-						current_c[center + distance_from_center] += abs(ldata[2])
-						total[center + distance_from_center] += abs(ldata[2])
-				if (abs(distance_from_center) % 1) > 0:
-					if current_c[4] == '+':
-						current_c[int(center - distance_from_center)] += abs(ldata[2])
-						total[int(center - distance_from_center)] += abs(ldata[2])
-					elif current_c[4] == '-':
-						current_c[int(center + distance_from_center)] += abs(ldata[2])
-						total[int(center + distance_from_center)] += abs(ldata[2])
+			#if current ldata entry is in region of interest... do stuff
+			while True:			
+				if ldata[1] >= current_c[1] and ldata[1] <= current_c[2]:
+					ldata[2] = int(ldata[2])
+					distance_from_center = current_c[3] - ldata[1]
+					if (abs(distance_from_center) % 1) == 0:
+						if current_c[4] == '+':
+							current_c[center - distance_from_center] += abs(ldata[2])
+							total[center - distance_from_center] += abs(ldata[2])
+						elif current_c[4] == '-':
+							current_c[center + distance_from_center] += abs(ldata[2])
+							total[center + distance_from_center] += abs(ldata[2])
+					if (abs(distance_from_center) % 1) > 0:
+						if current_c[4] == '+':
+							current_c[int(center - distance_from_center)] += abs(ldata[2])
+							total[int(center - distance_from_center)] += abs(ldata[2])
+						elif current_c[4] == '-':
+							current_c[int(center + distance_from_center)] += abs(ldata[2])
+							total[int(center + distance_from_center)] += abs(ldata[2])
 
-
+				#if the current current_c entry is no longer needed...
+				if ldata[1] > current_c[2]:
+					if option == 1:
+						print('\t'.join(map(str,current_c)))
+					#if next_c overlaps with current_c 
+					if next_c[1] < current_c[2]:
+						for i in range((current_c[2]-next_c[1]+1)):
+							if current_c[-(i+1)] > 0:
+								next_c[i+6] = current_c[-(i+1)]
+								total[i+6] += current_c[-(i+1)]
+					#move on to the motif entry
+					current_c = next_c
+					if current_c == -1:
+						print('\t'.join(map(str,total)))
+						return
+					next_c = fimo_entry(next(c, -1), dist_5, dist_3, odd_len, region_len)
+				elif ldata[1] <= current_c[2]:
+					break
+		print('\t'.join(map(str,total)))
 
 '''
 	with open(iname) as z, open(fname) as f:
@@ -447,12 +467,14 @@ len_3 = int(sys.argv[4])
 if len(sys.argv) > 5:
 	if sys.argv[5] == 'sum-only':
 		sum_only = True
+		flag = 1
 	else:
 		sum_only = False
+		flag = 0
 else:
 	sum_only = False
 
-stream_version(in_file, fimo_file, len_5, len_3)
+stream_version(in_file, fimo_file, len_5, len_3, flag)
 
 '''
 arrays = count_fragments(in_file, fimo_file, len_5, len_3)
