@@ -422,10 +422,11 @@ def stream_version(sfile, cfile, dist_5, dist_3, flag):
 
 					#if next_c overlaps with current_c 
 					if next_c[0] == current_c[0] and next_c[1] < current_c[2]:
-						for i in range((current_c[2]-next_c[1]+1)):
+						x = (current_c[2]-next_c[1]+1)
+						for i in range(x):
 							if current_c[-(i+1)] > 0:
-								next_c[current_c[2]-i] += current_c[-(i+1)]
-								total[current_c[2]-i] += current_c[-(i+1)]
+								next_c[5+x-i] += current_c[-(i+1)]
+								total[5+x-i] += current_c[-(i+1)]
 
 					
 					#move on to the motif entry
