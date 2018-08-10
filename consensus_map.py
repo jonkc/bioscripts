@@ -272,9 +272,9 @@ def fimo_entry(line, dist_5, dist_3, odd_len, region_len):
 						print "WTF!!! shitty data"
 				elif odd_len is False:
 					if columns[5] == '+':
-						array.append((end - start)//2 + start - dist_5)
+						array.append((end - start)//2 + start - dist_5 + 1)
 					elif columns[5] == '-':
-						array.append((end - start)//2 + start - dist_3)
+						array.append((end - start)//2 + start - dist_3 + 1)
 					else:
 						print "WTF!!! shitty data #2"
 			elif i == 4:
@@ -288,9 +288,9 @@ def fimo_entry(line, dist_5, dist_3, odd_len, region_len):
 						print "WTF!!! shitty data #3"
 				elif odd_len is False:
 					if columns[5] == '+':
-						array.append((end - start)//2 + start + dist_3 - 1)
+						array.append((end - start)//2 + start + dist_3)
 					elif columns[5] == '-':
-						array.append((end - start)//2 + start + dist_5 - 1)
+						array.append((end - start)//2 + start + dist_5)
 					else:
 						print "WTF!!! shitty data #4"
 
@@ -363,19 +363,36 @@ def stream_version(sfile, cfile, dist_5, dist_3, flag):
 		for i in range(region_len):
 			total.append(0)
 
+		current_chrID = 0
 		for line in s:
 			ldata = line.split('\t')
 			ldata[1] = int(ldata[1])
 
-			#if chromosome name in ldata[0] does not match the chrID in motif data current_c[0], skip
-			if ldata[0] != current_c[0]:
-				continue
-			#if position value of ldata[1] is smaller than the motif region current_c[1], skip
-			if ldata[1] < current_c[1]:
-				continue
-
 			#if current ldata entry is in region of interest... do stuff
-			while True:			
+			while True:
+				#check if chrID of ldata and current_c matches
+				if ldata[0] == current_c[0]:
+					current_chrID = ldata[0]
+				if current_chrID != ldata[0]:
+					while True:
+						if flag == 0:
+							print('\t'.join(map(str,current_c)))
+						if next_c == -1:
+							print('\t'.join(map(str,total)))
+							return
+						current_c = next_c
+						next_c = fimo_entry(next(c, -1), dist_5, dist_3, odd_len, region_len)
+						if current_c[0] == ldata[0]:
+							current_chrID = ldata[0]
+							break
+				elif current_chrID != current_c[0]:
+					break
+
+				#if position value of ldata[1] is smaller than the motif region current_c[1], skip
+				if ldata[1] < current_c[1]:
+					break
+					#continue
+
 				if ldata[1] >= current_c[1] and ldata[1] <= current_c[2]:
 					ldata[2] = int(ldata[2])
 					distance_from_center = current_c[3] - ldata[1]
@@ -396,69 +413,31 @@ def stream_version(sfile, cfile, dist_5, dist_3, flag):
 
 				#if the current current_c entry is no longer needed...
 				if ldata[1] > current_c[2]:
-					if option == 1:
+					#print current_c
+					if flag == 0:
 						print('\t'.join(map(str,current_c)))
-					#if next_c overlaps with current_c 
-					if next_c[1] < current_c[2]:
-						for i in range((current_c[2]-next_c[1]+1)):
-							if current_c[-(i+1)] > 0:
-								next_c[i+6] = current_c[-(i+1)]
-								total[i+6] += current_c[-(i+1)]
-					#move on to the motif entry
-					current_c = next_c
-					if current_c == -1:
+					if next_c == -1:
 						print('\t'.join(map(str,total)))
 						return
+
+					#if next_c overlaps with current_c 
+					if next_c[0] == current_c[0] and next_c[1] < current_c[2]:
+						for i in range((current_c[2]-next_c[1]+1)):
+							if current_c[-(i+1)] > 0:
+								next_c[current_c[2]-i] += current_c[-(i+1)]
+								total[current_c[2]-i] += current_c[-(i+1)]
+
+					
+					#move on to the motif entry
+					current_c = next_c
 					next_c = fimo_entry(next(c, -1), dist_5, dist_3, odd_len, region_len)
 				elif ldata[1] <= current_c[2]:
 					break
+					#continue
+		if ldata[1] <= current_c[2] and next_c == -1:
+			print('\t'.join(map(str,current_c)))
 		print('\t'.join(map(str,total)))
 
-'''
-	with open(iname) as z, open(fname) as f:
-		#Skip header in files
-		next(z)
-		next(f)
-		fimo_list = [] #This list will contain
-		#Retrieve a few consensus entries from fimo tsv
-		fimo_list.append(fimo_entry(next(f), dist_5, dist_3, odd_len, region_len))
-		while True:
-			fimo_entry = fimo_entry(next(f), dist_5, dist_3, odd_len, region_len)
-			if fimo_entry != -1:
-				fimo_list.append(fimo_entry)
-			else:
-				break
-			if fimo_list[(len(fimo_list)-1)][0] != fimo_list[0][0]:
-				break
-			elif fimo_list[(len(fimo_list)-1)][1] > fimo_list[0][2]:
-				break
-
-		for line in z:
-			query = line.split('\t')
-			if int(query[1]) > fimo_list[0]:
-				print fimo_list[0]
-				fimo_list = fimo_list[1:]
-
-				while True:
-					fimo_entry = fimo_entry(next(f), dist_5, dist_3, odd_len, region_len)
-					if fimo_entry != -1:
-						fimo_list.append(fimo_entry)
-					else:
-						break
-					if fimo_list[(len(fimo_list)-1)][0] != fimo_list[0][0]:
-						break
-					elif fimo_list[(len(fimo_list)-1)][1] > fimo_list[0][2]:
-						break
-
-
-			for entry in fimo_list:
-				#if chrid dont match move on to next line in z
-				if query[0] != entry[0]:
-					break
-				#if query pos is < than 5post, move on
-				if int(query[1]) < entry[1]:
-					break
-'''
 
 in_file = file_path(sys.argv[1])
 fimo_file = file_path(sys.argv[2])
@@ -473,6 +452,7 @@ if len(sys.argv) > 5:
 		flag = 0
 else:
 	sum_only = False
+	flag = 0
 
 stream_version(in_file, fimo_file, len_5, len_3, flag)
 
